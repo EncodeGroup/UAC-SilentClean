@@ -33,6 +33,7 @@ The project consists of:
 * Current spawned process to inject to is `cmd.exe`. 
 * No shellcode encryption / compression has been baked in. As such the DLL generated will probably be **flagged by an AV**
 * x86_64-w64-mingw32 and headers are required to be installed on the building system
+* If CNA can not find mingw replace the variables $mingwgcc $mingwdllwrap with your path
 * Compile SilentClean .NET project and place executable in the same folder as the CNA script
 
 
